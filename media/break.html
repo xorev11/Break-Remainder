@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'">
+<title>Перерыв</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background:#fafafa; color:#111; padding:20px; text-align:center; }
+  h2 { margin-top:2px; }
+  .choices { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:12px 0; }
+  .choice { padding:10px 14px; background:#007acc; color:#fff; border-radius:8px; cursor:pointer; }
+  .choice:hover { background:#0096ff; transform:translateY(-2px); }
+  .rec { background:#fff; border:1px solid #ddd; padding:12px; border-radius:8px; margin-top:12px; text-align:left; max-width:520px; margin-left:auto; margin-right:auto; }
+  .countdown { font-size:20px; margin-top:14px; }
+  .endbtn { margin-top:16px; padding:10px 14px; background:#0e639c; color:#fff; border-radius:8px; cursor:pointer; }
+  .back { margin-top:8px; background:#eee; color:#333; padding:8px 12px; border-radius:8px; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div id="chooseView">
+    <h2>Выберите длительность перерыва</h2>
+    <div class="choices">
+      <div class="choice" data-min="5">5</div>
+      <div class="choice" data-min="10">10</div>
+      <div class="choice" data-min="15">15</div>
+      <div class="choice" data-min="20">20</div>
+      <div class="choice" data-min="25">25</div>
+      <div class="choice" data-min="30">30</div>
+    </div>
+    <div><button class="back" id="back">← Назад</button></div>
+  </div>
+
+  <div id="breakView" style="display:none;">
+    <h2 id="breakTitle">Перерыв</h2>
+    <div class="countdown" id="countdown">00:00</div>
+    <div class="rec" id="recs"></div>
+    <div>
+      <button class="endbtn" id="endNow">Завершить перерыв</button>
+    </div>
+  </div>
+
+<script>
+  /*__INJECT_PAYLOAD__*/  // сюда подставим payload с minutes и recommendations
+
+  const vscode = acquireVsCodeApi();
+
+  // выбор длительности (вызывает extension через postMessage)
+  document.querySelectorAll('.choice').forEach(node=>{
+    node.addEventListener('click', ()=>{
+      const mins = parseInt(node.getAttribute('data-min'), 10);
+      vscode.postMessage({ command: 'breakDurationSelected', minutes: mins });
+    });
+  });
+
+  document.getElementById('back').addEventListener('click', ()=> {
+    vscode.postMessage({ command: 'backToMain' });
+  });
+
+  (function(){
+    if (window.__BR_PAYLOAD__) {
+      const payload = window.__BR_PAYLOAD__;
+      if (payload.minutes && payload.recommendations) {
+        showBreak(payload.minutes, payload.recommendations);
+      }
+    }
+  })();
+
+  let intervalId = null;
+  function showBreak(minutes, recommendations) {
+    document.getElementById('chooseView').style.display = 'none';
+    document.getElementById('breakView').style.display = 'block';
+    document.getElementById('breakTitle').textContent = `Перерыв ${minutes} мин`;
+    const recs = document.getElementById('recs');
+    recs.innerHTML = '<b>Рекомендации:</b><ul>' + recommendations.map(r=>`<li>${r}</li>`).join('') + '</ul>';
+    const end = Date.now() + minutes * 60 * 1000;
+    updateCountdown(end);
+    intervalId = setInterval(()=> updateCountdown(end), 1000);
+
+    document.getElementById('endNow').addEventListener('click', ()=> {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      vscode.postMessage({ command: 'breakEnded' });
+    });
+  }
+
+  function updateCountdown(end) {
+    const diff = Math.max(0, end - Date.now());
+    const sec = Math.floor(diff / 1000);
+    const mm = Math.floor(sec / 60).toString().padStart(2,'0');
+    const ss = (sec % 60).toString().padStart(2,'0');
+    document.getElementById('countdown').textContent = `${mm}:${ss}`;
+    if (diff <= 0) {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      vscode.postMessage({ command: 'breakEnded' });
+    }
+  }
+</script>
+</body>
+</html>
