@@ -79,6 +79,10 @@ function showMainMenu(context: vscode.ExtensionContext) {
             isDisabledThisSession = true;
             if (timer) { clearTimeout(timer); timer = undefined; }
             vscode.window.showInformationMessage('Break Reminder отключён в этой сессии.');
+        } else if (msg.command === 'setWorkTime') {
+            panel.dispose();
+            currentPanelOpen = false;
+            await showSetWorkTime(context);
         }
     });
 
@@ -101,6 +105,7 @@ async function showBreakChooser(context: vscode.ExtensionContext) {
     const htmlPath = path.join(context.extensionPath, 'media', 'break.html');
     let html = '<html><body><h3>Ошибка загрузки панели</h3></body></html>';
     try { html = fs.readFileSync(htmlPath, 'utf8'); } catch(e){ console.error(e); }
+
     panel.webview.html = html;
 
     const sub = panel.webview.onDidReceiveMessage(async (msg) => {
@@ -108,8 +113,11 @@ async function showBreakChooser(context: vscode.ExtensionContext) {
 
         if (msg.command === 'breakDurationSelected' && typeof msg.minutes === 'number') {
             const minutes = msg.minutes;
+            // Закрываем панель выбора времени
             panel.dispose();
             currentPanelOpen = false;
+
+            // Открываем панель перерыва с таймером и рекомендациями
             await openBreakPanel(context, minutes);
         } else if (msg.command === 'backToMain') {
             panel.dispose();
@@ -128,6 +136,14 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
     currentPanelOpen = true;
     isPausedManually = true;
 
+    const recommendations = [
+    '👀 Сделай зарядку для глаз.',
+    '💧 Обязательно попей воды.',
+    '🤸 Встань и разомнись: наклоны, повороты шеи.',
+    '🏋️ Не забывай следить за осанкой.',
+    '😈 Так уж и быть, разрешаю сбегать в туалет'
+    ];
+
     const panel = vscode.window.createWebviewPanel(
         'breakPanel',
         `Перерыв ${breakMinutes} мин`,
@@ -135,27 +151,58 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
         { enableScripts: true }
     );
 
-    const htmlPath = path.join(context.extensionPath, 'media', 'snooze.html');
-    let html = '<html><body>Ошибка загрузки панели</body></html>';
-    try {
-        html = fs.readFileSync(htmlPath, 'utf8') + `\n<!-- ${Date.now()} -->`;
-    } catch(e) { console.error(e); }
+    // HTML с таймером
+    const html = `
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+      <meta charset="UTF-8">
+      <title>Перерыв</title>
+      <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align:center; background:#1e1e1e; color:#fff; padding:20px; }
+        h2 { font-size: 26px; } 
+        #timer { font-size: 48px; margin: 20px 0; } 
+        button { padding:10px 14px; margin:10px; border:none; border-radius:8px; cursor:pointer; background:#0e639c; color:#fff; }
+        ul { text-align:left; display:inline-block; font-size:16px; } 
+    </style>
+    </head>
+    <body>
+      <h2>Перерыв ${breakMinutes} мин</h2>
+      <div id="timer">${breakMinutes}:00</div>
+      <ul>${recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
+      <br>
+      <button id="end">Завершить перерыв</button>
+      <script>
+        const vscode = acquireVsCodeApi();
+        let seconds = ${breakMinutes * 60};
+        const timerEl = document.getElementById('timer');
+
+        const interval = setInterval(() => {
+          seconds--;
+          const m = Math.floor(seconds/60);
+          const s = seconds % 60;
+          timerEl.textContent = m + ':' + (s < 10 ? '0'+s : s);
+          if (seconds <= 0) {
+            clearInterval(interval);
+            vscode.postMessage({ command: 'breakEnded' });
+          }
+        }, 1000);
+
+        document.getElementById('end').addEventListener('click', () => {
+          clearInterval(interval);
+          vscode.postMessage({ command: 'breakEnded' });
+        });
+      </script>
+    </body>
+    </html>
+    `;
 
     panel.webview.html = html;
 
-    const breakMs = breakMinutes * 60 * 1000;
-    const breakTimer = setTimeout(() => {
-        if (panel) panel.dispose();
-        vscode.window.showInformationMessage('Перерыв завершён, работа продолжается.');
-        currentPanelOpen = false;
-        isPausedManually = false;
-        startWorkTimer(context);
-    }, breakMs);
-
     const sub = panel.webview.onDidReceiveMessage(msg => {
         if (!msg?.command) return;
+
         if (msg.command === 'breakEnded') {
-            clearTimeout(breakTimer);
             panel.dispose();
             vscode.window.showInformationMessage('Перерыв завершён, работа продолжается.');
             currentPanelOpen = false;
@@ -172,7 +219,6 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
 
 async function askSnoozeAndStart(context: vscode.ExtensionContext) {
     currentPanelOpen = true;
-    isPausedManually = true;
 
     const panel = vscode.window.createWebviewPanel(
         'snoozeChooser',
@@ -181,12 +227,11 @@ async function askSnoozeAndStart(context: vscode.ExtensionContext) {
         { enableScripts: true }
     );
 
-    // Читаем файл snooze.html
     const htmlPath = path.join(context.extensionPath, 'media', 'snooze.html');
-    let html = '<html><body>Ошибка загрузки панели</body></html>';
+    let html = '<html><body><h3>Ошибка загрузки панели</h3></body></html>';
     try {
-        html = fs.readFileSync(htmlPath, 'utf8') + `\n<!-- ${Date.now()} -->`;
-    } catch (e) {
+        html = fs.readFileSync(htmlPath, 'utf8');
+    } catch(e) {
         console.error(e);
     }
 
@@ -194,23 +239,15 @@ async function askSnoozeAndStart(context: vscode.ExtensionContext) {
 
     const sub = panel.webview.onDidReceiveMessage(msg => {
         if (!msg?.command) return;
-
         if (msg.command === 'confirmSnooze' && typeof msg.minutes === 'number') {
-            // Конвертируем минуты в миллисекунды
             const ms = Math.max(1000, Math.round(msg.minutes * 60 * 1000));
-
-            // Отменяем старый таймер, если был
             if (timer) { clearTimeout(timer); timer = undefined; }
-
-            // Устанавливаем таймер на отложенный перерыв
             timer = setTimeout(() => { showMainMenu(context); }, ms);
-
             panel.dispose();
             currentPanelOpen = false;
         } else if (msg.command === 'cancelSnooze') {
             panel.dispose();
             currentPanelOpen = false;
-            // Возвращаемся в главное меню
             showMainMenu(context);
         }
     });
@@ -221,6 +258,37 @@ async function askSnoozeAndStart(context: vscode.ExtensionContext) {
     });
 }
 
+async function showSetWorkTime(context: vscode.ExtensionContext) {
+    currentPanelOpen = true;
+
+    const panel = vscode.window.createWebviewPanel(
+        'setWorkTime',
+        'Настроить рабочее время',
+        vscode.ViewColumn.Active,
+        { enableScripts: true }
+    );
+
+    const htmlPath = path.join(context.extensionPath, 'media', 'setWorkTime.html');
+    let html = '<html><body><h3>Ошибка загрузки панели</h3></body></html>';
+    try { html = fs.readFileSync(htmlPath, 'utf8'); } catch(e){ console.error(e); }
+
+    panel.webview.html = html;
+
+    const sub = panel.webview.onDidReceiveMessage(msg => {
+        if (!msg?.command) return;
+        if (msg.command === 'workTimeSelected' && typeof msg.minutes === 'number') {
+            context.globalState.update('workMinutes', msg.minutes);
+            panel.dispose();
+            currentPanelOpen = false;
+            showMainMenu(context);
+        }
+    });
+
+    panel.onDidDispose(() => {
+        sub.dispose();
+        currentPanelOpen = false;
+    });
+}
 
 export function deactivate() {
     if (timer) { clearTimeout(timer); timer = undefined; }

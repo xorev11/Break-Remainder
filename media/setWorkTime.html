@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Настроить рабочее время</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    text-align: center;
+    background: #1e1e1e;
+    color: #fff;
+    padding: 20px;
+  }
+  h2 {
+    font-size: 28px;
+    margin-bottom: 20px;
+  }
+  button {
+    display: block;
+    margin: 8px auto;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #0e639c;
+    color: #fff;
+    font-size: 16px;
+    width: 200px;
+  }
+</style>
+</head>
+<body>
+  <h2>Выберите рабочее время</h2>
+
+  <button data-minutes="0.1666">10 секунд (тест)</button>
+  <button data-minutes="1">1 минута</button>
+  <button data-minutes="5">5 минут</button>
+  <button data-minutes="10">10 минут</button>
+  <button data-minutes="15">15 минут</button>
+  <button data-minutes="20">20 минут</button>
+  <button data-minutes="25">25 минут</button>
+  <button data-minutes="30">30 минут</button>
+  <button data-minutes="35">35 минут</button>
+  <button data-minutes="40">40 минут</button>
+  <button data-minutes="45">45 минут</button>
+  <button data-minutes="50">50 минут</button>
+  <button data-minutes="55">55 минут</button>
+  <button data-minutes="60">1 час</button>
+
+<script>
+  const vscode = acquireVsCodeApi();
+  document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const minutes = parseFloat(btn.getAttribute('data-minutes'));
+      vscode.postMessage({ command: 'workTimeSelected', minutes });
+    });
+  });
+</script>
+</body>
+</html>
