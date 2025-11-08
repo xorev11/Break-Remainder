@@ -1,11 +1,18 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { exec } from 'child_process';
 
 let timer: NodeJS.Timeout | undefined;
 let currentPanelOpen = false;
 let isDisabledThisSession = false;
 let isPausedManually = false;
+
+
+function notifyBreak(context: vscode.ExtensionContext) {
+    const soundPath = path.join(context.extensionPath, 'media', 'mysound.wav');
+    exec(`powershell -c (New-Object Media.SoundPlayer '${soundPath}').PlaySync()`);
+}
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Break Reminder activated');
@@ -37,7 +44,22 @@ function startWorkTimer(context: vscode.ExtensionContext) {
 
     timer = setTimeout(() => {
         if (timer) { clearTimeout(timer); timer = undefined; }
-        showMainMenu(context);
+
+        notifyBreak(context);
+
+        if (!currentPanelOpen) {
+            vscode.window.showInformationMessage(
+                'Пришло время выбрать перерыв!',
+                'Выбрать перерыв'
+            ).then(selection => {
+                if (selection === 'Выбрать перерыв') {
+                    showMainMenu(context);
+                }
+            });
+        } else {
+            showMainMenu(context);
+        }
+
     }, ms);
 }
 
@@ -85,7 +107,6 @@ function showMainMenu(context: vscode.ExtensionContext) {
             await showSetWorkTime(context);
         }
     });
-
     panel.onDidDispose(() => {
         sub.dispose();
         currentPanelOpen = false;
@@ -113,11 +134,8 @@ async function showBreakChooser(context: vscode.ExtensionContext) {
 
         if (msg.command === 'breakDurationSelected' && typeof msg.minutes === 'number') {
             const minutes = msg.minutes;
-            // Закрываем панель выбора времени
             panel.dispose();
             currentPanelOpen = false;
-
-            // Открываем панель перерыва с таймером и рекомендациями
             await openBreakPanel(context, minutes);
         } else if (msg.command === 'backToMain') {
             panel.dispose();
@@ -151,7 +169,6 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
         { enableScripts: true }
     );
 
-    // HTML с таймером
     const html = `
     <!DOCTYPE html>
     <html lang="ru">
