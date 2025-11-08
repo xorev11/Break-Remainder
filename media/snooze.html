@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Отложить перерыв</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            display: block;
+            width: 200px;
+            padding: 12px 0;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            color: #fff;
+            background-color: #0e639c;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #1177bb;
+        }
+
+        .cancel {
+            background-color: #666;
+        }
+
+        .cancel:hover {
+            background-color: #888;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Отложить перерыв</h2>
+
+    <button class="btn" id="10sec">10 секунд (тест)</button>
+    <button class="btn" id="1min">1 минута</button>
+    <button class="btn" id="5min">5 минут</button>
+    <button class="btn" id="10min">10 минут</button>
+    <button class="btn" id="15min">15 минут</button>
+
+    <button class="btn cancel" id="cancel">Отмена</button>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        document.getElementById('10sec').addEventListener('click', () =>
+            vscode.postMessage({ command: 'confirmSnooze', minutes: 0.1666 }) // 10 секунд
+        );
+        document.getElementById('1min').addEventListener('click', () =>
+            vscode.postMessage({ command: 'confirmSnooze', minutes: 1 })
+        );
+        document.getElementById('5min').addEventListener('click', () =>
+            vscode.postMessage({ command: 'confirmSnooze', minutes: 5 })
+        );
+        document.getElementById('10min').addEventListener('click', () =>
+            vscode.postMessage({ command: 'confirmSnooze', minutes: 10 })
+        );
+        document.getElementById('15min').addEventListener('click', () =>
+            vscode.postMessage({ command: 'confirmSnooze', minutes: 15 })
+        );
+
+        document.getElementById('cancel').addEventListener('click', () =>
+            vscode.postMessage({ command: 'cancelSnooze' })
+        );
+    </script>
+</body>
+
+</html>
