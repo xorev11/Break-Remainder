@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Break Reminder activated');
 
     const cfg = vscode.workspace.getConfiguration('breakReminder');
-    const defaultWork = cfg.get<number>('defaultWorkMinutes', 30);
+    const defaultWork = cfg.get<number>('defaultWorkMinutes', 0.166);
     const stored = context.globalState.get<number>('workMinutes');
     if (!stored) context.globalState.update('workMinutes', defaultWork);
 
@@ -212,27 +212,32 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
     /*
     Описание:
         Отображает панель активного перерыва с таймером обратного отсчёта.
-        Также показывает полезные рекомендации для отдыха (с эмодзи)
+        Показывает полезные рекомендации.
+        Если перерыв меньше 1 минуты, заголовок показывает секунды.
         Когда таймер заканчивается, пользователь видит сообщение «Перерыв завершён, работа продолжается».
 
     Пример работы:
-        Если пользователь выбрал перерыв на 10 минут, то на экране появляется таймер, уменьшающийся от 10:00 до 00:00,
-        и список рекомендаций. После завершения таймера автоматически начинается новый рабочий цикл.
+        Если выбран перерыв на 10 секунд, заголовок будет "Перерыв 10 сек", таймер отсчитывает от 10 до 0.
+        Если выбран перерыв на 5 минут, заголовок будет "Перерыв 5 мин", таймер отсчитывает от 5:00 до 0:00.
      */
     currentPanelOpen = true;
     isPausedManually = true;
 
     const recommendations = [
-    '👀 Сделай зарядку для глаз.',
-    '💧 Обязательно попей воды.',
-    '🤸 Встань и разомнись: наклоны, повороты шеи.',
-    '🏋️ Не забывай следить за осанкой.',
-    '😈 Так уж и быть, разрешаю сбегать в туалет'
+        '👀 Сделай зарядку для глаз.',
+        '💧 Обязательно попей воды.',
+        '🤸 Встань и разомнись: наклоны, повороты шеи.',
+        '🏋️ Не забывай следить за осанкой.'
     ];
+
+    const totalSeconds = Math.round(breakMinutes * 60);
+
+    // Форматируем заголовок: если меньше минуты — показываем секунды, иначе минуты
+    const displayTitle = totalSeconds < 60 ? `${totalSeconds} сек` : `${Math.round(breakMinutes)} мин`;
 
     const panel = vscode.window.createWebviewPanel(
         'breakPanel',
-        `Перерыв ${breakMinutes} мин`,
+        `Перерыв ${displayTitle}`,
         vscode.ViewColumn.Active,
         { enableScripts: true }
     );
@@ -249,17 +254,17 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
         #timer { font-size: 48px; margin: 20px 0; } 
         button { padding:10px 14px; margin:10px; border:none; border-radius:8px; cursor:pointer; background:#0e639c; color:#fff; }
         ul { text-align:left; display:inline-block; font-size:16px; } 
-    </style>
+      </style>
     </head>
     <body>
-      <h2>Перерыв ${breakMinutes} мин</h2>
-      <div id="timer">${breakMinutes}:00</div>
+      <h2>Перерыв ${displayTitle}</h2>
+      <div id="timer">${Math.floor(totalSeconds/60)}:${(totalSeconds%60).toString().padStart(2,'0')}</div>
       <ul>${recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
       <br>
       <button id="end">Завершить перерыв</button>
       <script>
         const vscode = acquireVsCodeApi();
-        let seconds = ${breakMinutes * 60};
+        let seconds = ${totalSeconds};
         const timerEl = document.getElementById('timer');
 
         const interval = setInterval(() => {
@@ -286,7 +291,6 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
 
     const sub = panel.webview.onDidReceiveMessage(msg => {
         if (!msg?.command) return;
-
         if (msg.command === 'breakEnded') {
             panel.dispose();
             vscode.window.showInformationMessage('Перерыв завершён, работа продолжается.');
@@ -332,24 +336,30 @@ async function askSnoozeAndStart(context: vscode.ExtensionContext) {
     panel.webview.html = html;
 
     const sub = panel.webview.onDidReceiveMessage(msg => {
-        if (!msg?.command) return;
-        if (msg.command === 'confirmSnooze' && typeof msg.minutes === 'number') {
-            const ms = Math.max(1000, Math.round(msg.minutes * 60 * 1000));
-            if (timer) { clearTimeout(timer); timer = undefined; }
-            timer = setTimeout(() => { showMainMenu(context); }, ms);
-            panel.dispose();
-            currentPanelOpen = false;
-        } else if (msg.command === 'cancelSnooze') {
-            panel.dispose();
-            currentPanelOpen = false;
-            showMainMenu(context);
-        }
-    });
+    if (!msg?.command) return;
 
-    panel.onDidDispose(() => {
-        sub.dispose();
+    if (msg.command === 'confirmSnooze' && typeof msg.minutes === 'number') {
+        const ms = Math.max(1000, Math.round(msg.minutes * 60 * 1000));
+        if (timer) { clearTimeout(timer); timer = undefined; }
+        timer = setTimeout(() => { notifyBreak(context);
+            vscode.window.showInformationMessage(
+                'Пришло время выбрать перерыв!',
+                'Выбрать перерыв'
+            ).then(selection => {
+                if (selection === 'Выбрать перерыв') {
+                    showMainMenu(context);
+                }
+            });
+        }, ms);
+
+        panel.dispose();
         currentPanelOpen = false;
-    });
+    } else if (msg.command === 'cancelSnooze') {
+        panel.dispose();
+        currentPanelOpen = false;
+        showMainMenu(context);
+    }
+});
 }
 
 async function showSetWorkTime(context: vscode.ExtensionContext) {
