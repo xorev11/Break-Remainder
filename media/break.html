@@ -1,3 +1,8 @@
+<!--
+Это панель выбора длительности перерыва.
+Содержит кнопки с разными временными промежутками (например, 10 секунд, 1 минута, 5 минут…).
+После выбора времени вызывает панель с таймером и рекомендациями.
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -56,6 +61,9 @@
   <button class="btn" id="5min">5 минут</button>
   <button class="btn" id="10min">10 минут</button>
   <button class="btn" id="15min">15 минут</button>
+  <button class="btn" id="20min">20 минут</button>
+  <button class="btn" id="25min">25 минут</button>
+  <button class="btn" id="30min">30 минут</button>
   
   <button class="btn cancel" id="back">Назад</button>
 
@@ -72,6 +80,15 @@
     );
     document.getElementById('15min').addEventListener('click', () => 
       vscode.postMessage({command:'breakDurationSelected', minutes:15})
+    );
+    document.getElementById('20min').addEventListener('click', () => 
+      vscode.postMessage({command:'breakDurationSelected', minutes:20})
+    );
+    document.getElementById('25min').addEventListener('click', () => 
+      vscode.postMessage({command:'breakDurationSelected', minutes:25})
+    );
+    document.getElementById('30min').addEventListener('click', () => 
+      vscode.postMessage({command:'breakDurationSelected', minutes:30})
     );
     document.getElementById('back').addEventListener('click', () => 
       vscode.postMessage({command:'backToMain'})

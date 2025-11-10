@@ -1,14 +1,58 @@
+<!--
+Это панель отложения перерыва.
+Позволяет выбрать, на сколько минут отложить перерыв.
+Содержит кнопки с временными интервалами и кнопку "Отмена".
+ -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>Отложить перерыв</title>
 <style>
-  body { font-family:'Segoe UI', sans-serif; text-align:center; padding:20px; background:#1e1e1e; color:white; }
-  button { padding:10px 14px; margin:5px; border:none; border-radius:8px; cursor:pointer; background:#0e639c; color:white; }
-  .cancel { background:#666; color:white; }
-  .options { display:flex; justify-content:center; flex-wrap:wrap; margin-top:20px; }
-  
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    text-align: center;
+    padding: 20px;
+    background: #1e1e1e;
+    color: white;
+  }
+
+  h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  button {
+    width: 200px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #0e639c;
+    color: white;
+    font-size: 16px;
+    transition: background 0.2s;
+  }
+
+  button:hover {
+    background: #1177bb;
+  }
+
+  #cancel {
+    background: #666;
+  }
+
+  #cancel:hover {
+    background: #888;
+  }
 </style>
 </head>
 <body>
@@ -21,18 +65,20 @@
     <button data-minutes="15">15 минут</button>
   </div>
   <br>
-  <button id="cancel" class="cancel">Отмена</button>
+  <button id="cancel">Отмена</button>
 
   <script>
     const vscode = acquireVsCodeApi();
-    document.querySelectorAll('.options button').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+
+    document.querySelectorAll('.options button').forEach(btn => {
+      btn.addEventListener('click', () => {
         const val = parseFloat(btn.dataset.minutes);
-        vscode.postMessage({ command:'confirmSnooze', minutes: val });
+        vscode.postMessage({ command: 'confirmSnooze', minutes: val });
       });
     });
-    document.getElementById('cancel').addEventListener('click', ()=>{
-      vscode.postMessage({ command:'cancelSnooze' });
+
+    document.getElementById('cancel').addEventListener('click', () => {
+      vscode.postMessage({ command: 'cancelSnooze' });
     });
   </script>
 </body>

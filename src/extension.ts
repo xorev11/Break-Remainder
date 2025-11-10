@@ -10,11 +10,29 @@ let isPausedManually = false;
 
 
 function notifyBreak(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Функция отвечает за воспроизведение звукового сигнала при наступлении перерыва.
+        Она принимает путь к файлу mysound.wav, хранящемуся в папке media плагина, и воспроизводит его средствами PowerShell.
+
+    Пример работы:   
+        Когда заканчивается рабочий таймер, вызывается notifyBreak(context) - пользователь слышит звуковое уведомление, что пора сделать перерыв.
+    */
     const soundPath = path.join(context.extensionPath, 'media', 'mysound.wav');
     exec(`powershell -c (New-Object Media.SoundPlayer '${soundPath}').PlaySync()`);
 }
 
 export function activate(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Главная функция активации расширения VS Code.
+        Вызывается автоматически при запуске редактора.
+        Инициализирует значения по умолчанию, считывает настройки из settings.json, запускает рабочий таймер, если плагин не отключён пользователем.
+        Также регистрирует обработчик деактивации.
+
+    Пример работы:
+        После открытия VS Code плагин автоматически запустится и начнёт отсчёт времени до следующего перерыва.
+     */
     console.log('Break Reminder activated');
 
     const cfg = vscode.workspace.getConfiguration('breakReminder');
@@ -28,12 +46,30 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function getWorkMinutes(context: vscode.ExtensionContext): number {
+    /*
+    Описание:
+        Возвращает текущее установленное время рабочего цикла (в минутах).
+        Если пользователь не менял настройку, используется значение по умолчанию (30 минут).
+
+    Пример работы:
+        Если пользователь не задавал своё время — функция вернёт 30.
+        Если пользователь через меню установил 45, функция вернёт 45.
+    */ 
     const v = context.globalState.get<number>('workMinutes');
     if (typeof v === 'number' && v > 0) return v;
     return vscode.workspace.getConfiguration('breakReminder').get<number>('defaultWorkMinutes', 30);
 }
 
 function startWorkTimer(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Запускает таймер рабочего времени.
+        После истечения заданного количества минут плагин отправляет пользователю уведомление с предложением сделать перерыв.
+        Если в момент срабатывания открыта панель плагина, уведомление не отображается.
+
+    Пример работы:
+        Пользователь работает 30 минут — по истечении этого времени на экране появляется уведомление
+     */
     if (currentPanelOpen || isDisabledThisSession || isPausedManually) return;
 
     if (timer) { clearTimeout(timer); timer = undefined; }
@@ -64,6 +100,20 @@ function startWorkTimer(context: vscode.ExtensionContext) {
 }
 
 function showMainMenu(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Показывает основное меню плагина в виде webview-панели.
+        В меню можно выбрать:
+        Начать перерыв
+        Пропустить перерыв
+        Отложить перерыв
+        Изменить рабочее время
+        Отключить плагин на текущую сессию
+        Функция также слушает команды, отправляемые из webview (через postMessage).
+    Пример работы:
+        Пользователь нажимает «Выбрать перерыв» — открывается основное меню.
+        Там он может, например, нажать «Отложить перерыв» и выбрать, на сколько минут отложить.
+    */
     currentPanelOpen = true;
     isPausedManually = true;
 
@@ -114,6 +164,14 @@ function showMainMenu(context: vscode.ExtensionContext) {
 }
 
 async function showBreakChooser(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Открывает окно выбора длительности перерыва.
+        Пользователь выбирает, например, 5, 10 или 15 минут — после выбора открывается панель перерыва с таймером.
+
+    Пример работы:
+        После нажатия на кнопку «Начать перерыв» открывается панель с выбором времени для перерыва.
+     */
     currentPanelOpen = true;
 
     const panel = vscode.window.createWebviewPanel(
@@ -151,6 +209,16 @@ async function showBreakChooser(context: vscode.ExtensionContext) {
 }
 
 async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: number) {
+    /*
+    Описание:
+        Отображает панель активного перерыва с таймером обратного отсчёта.
+        Также показывает полезные рекомендации для отдыха (с эмодзи)
+        Когда таймер заканчивается, пользователь видит сообщение «Перерыв завершён, работа продолжается».
+
+    Пример работы:
+        Если пользователь выбрал перерыв на 10 минут, то на экране появляется таймер, уменьшающийся от 10:00 до 00:00,
+        и список рекомендаций. После завершения таймера автоматически начинается новый рабочий цикл.
+     */
     currentPanelOpen = true;
     isPausedManually = true;
 
@@ -235,6 +303,15 @@ async function openBreakPanel(context: vscode.ExtensionContext, breakMinutes: nu
 }
 
 async function askSnoozeAndStart(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Открывает окно, где пользователь может выбрать, на сколько минут отложить перерыв.
+        После выбора плагин устанавливает новый таймер, по истечении которого снова предложит сделать перерыв.
+
+    Пример работы:
+        Если пользователь выбрал «Отложить перерыв» и указал 10 минут, то новый таймер запустится на 10 минут.
+        После этого снова появится уведомление о перерыве.
+    */
     currentPanelOpen = true;
 
     const panel = vscode.window.createWebviewPanel(
@@ -276,6 +353,16 @@ async function askSnoozeAndStart(context: vscode.ExtensionContext) {
 }
 
 async function showSetWorkTime(context: vscode.ExtensionContext) {
+    /*
+    Описание:
+        Позволяет пользователю настроить длительность рабочего периода вручную.
+        После выбора времени (например, 25 или 45 минут) это значение сохраняется в глобальном состоянии (globalState)
+        и используется при следующих запусках.
+
+    Пример работы:
+        Пользователь нажимает «Изменить рабочее время» и выбирает 45 минут.
+        Теперь каждый рабочий цикл длится 45 минут до следующего перерыва.
+     */
     currentPanelOpen = true;
 
     const panel = vscode.window.createWebviewPanel(
@@ -295,12 +382,17 @@ async function showSetWorkTime(context: vscode.ExtensionContext) {
         if (!msg?.command) return;
         if (msg.command === 'workTimeSelected' && typeof msg.minutes === 'number') {
             context.globalState.update('workMinutes', msg.minutes);
+            if (timer) {
+                clearTimeout(timer);
+                timer = undefined;
+            }
+            isPausedManually = false;
+            startWorkTimer(context);
             panel.dispose();
             currentPanelOpen = false;
             showMainMenu(context);
         }
     });
-
     panel.onDidDispose(() => {
         sub.dispose();
         currentPanelOpen = false;
@@ -308,6 +400,15 @@ async function showSetWorkTime(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+    /*
+    Описание:
+        Функция вызывается при отключении или закрытии плагина.
+        Очищает таймеры и сбрасывает флаги активности, чтобы предотвратить ошибки при повторной активации.
+
+    Пример работы:
+        Если пользователь перезапускает VS Code, перед этим вызывается deactivate() —
+        все таймеры сбрасываются, и плагин при следующем запуске начнёт работу заново
+     */
     if (timer) { clearTimeout(timer); timer = undefined; }
     currentPanelOpen = false;
     isDisabledThisSession = false;
